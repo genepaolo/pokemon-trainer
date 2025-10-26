@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pokemon ROMs (you shouldn't commit these!)
+*.gb
+*.gbc
+*.sav
+*.ram
+
+# Build artifacts
+*.o
+*.map
+*.sym
+*.lst
+*.bin
+
+# Compiled files
+*.2bpp
+*.1bpp
+*.pic
+*.bst
+*.rle
+*.blk.tilemap
+
+# Logs
+*.log
+logs/
+
+# TensorBoard
+tb/
+*.tfevents.*
+
+# PyBoy
+*.state
+
+# Keep pokered experimental as separate
+# pokered_experimental/
