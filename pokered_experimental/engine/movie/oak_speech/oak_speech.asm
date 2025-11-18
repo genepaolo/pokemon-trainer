@@ -61,9 +61,10 @@ OakSpeech:
 	call PrepareForSpecialWarp
 	xor a
 	ldh [hTileAnimations], a
-	ld a, [wStatusFlags6]
-	bit BIT_DEBUG_MODE, a
-	jp nz, .skipSpeech
+	; ld a, [wStatusFlags6] ; If debug mode, then skip
+	; bit BIT_DEBUG_MODE, a ; Make it so that we skip anyway
+	; jp nz, .skipSpeech
+	jp .skipSpeech
 	ld de, ProfOakPic
 	lb bc, BANK(ProfOakPic), $00
 	call IntroDisplayPicCenteredOrUpperRight
@@ -100,39 +101,7 @@ OakSpeech:
 	call PrintText
 	call ChooseRivalName
 .skipSpeech
-	call GBFadeOutToWhite
-	call ClearScreen
-	ld de, RedPicFront
-	lb bc, BANK(RedPicFront), $00
-	call IntroDisplayPicCenteredOrUpperRight
-	call GBFadeInFromWhite
-	ld a, [wStatusFlags3]
-	and a ; ???
-	jr nz, .next
-	ld hl, OakSpeechText3
-	call PrintText
-.next
-	ldh a, [hLoadedROMBank]
-	push af
-	ld a, SFX_SHRINK
-	call PlaySound
-	pop af
-	ldh [hLoadedROMBank], a
-	ld [rROMB], a
-	ld c, 4
-	call DelayFrames
-	ld de, RedSprite
-	ld hl, vSprites
-	lb bc, BANK(RedSprite), $0C
-	call CopyVideoData
-	ld de, ShrinkPic1
-	lb bc, BANK(ShrinkPic1), $00
-	call IntroDisplayPicCenteredOrUpperRight
-	ld c, 4
-	call DelayFrames
-	ld de, ShrinkPic2
-	lb bc, BANK(ShrinkPic2), $00
-	call IntroDisplayPicCenteredOrUpperRight
+	; Skip all animations - do minimal setup and return
 	call ResetPlayerSpriteData
 	ldh a, [hLoadedROMBank]
 	push af
@@ -147,19 +116,11 @@ OakSpeech:
 	pop af
 	ldh [hLoadedROMBank], a
 	ld [rROMB], a
-	ld c, 20
-	call DelayFrames
-	hlcoord 6, 5
-	ld b, 7
-	ld c, 7
-	call ClearScreenArea
 	call LoadTextBoxTilePatterns
 	ld a, 1
 	ld [wUpdateSpritesEnabled], a
-	ld c, 50
-	call DelayFrames
-	call GBFadeOutToWhite
-	jp ClearScreen
+	call ClearScreen
+	ret
 OakSpeechText1:
 	text_far _OakSpeechText1
 	text_end

@@ -96,7 +96,7 @@ Init::
 	dec a
 	ld [wUpdateSpritesEnabled], a
 
-	predef PlayIntro
+	; predef PlayIntro  ; Skip intro battle animation
 
 	call DisableLCD
 	call ClearVram

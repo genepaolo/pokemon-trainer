@@ -318,7 +318,7 @@ StartNewGame:
 	; only reset here by the main menu.
 	res BIT_DEBUG_MODE, [hl]
 	; fallthrough
-StartNewGameDebug:
+StartNewGameDebug::
 	call OakSpeech
 	ld c, 20
 	call DelayFrames

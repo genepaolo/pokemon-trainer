@@ -1,1 +1,4 @@
-
+pyboy
+gymnasium
+numpy
+Pillow

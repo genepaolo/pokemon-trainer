@@ -24,6 +24,28 @@ PrepareTitleScreen::
 	ld a, BANK(Music_TitleScreen)
 	ld [wAudioROMBank], a
 	ld [wAudioSavedROMBank], a
+	
+	; Do essential display initialization (from DisplayTitleScreen)
+	; but skip the actual title screen graphics and menu
+	call GBPalWhiteOut
+	ld a, $1
+	ldh [hAutoBGTransferEnabled], a
+	xor a
+	ldh [hTileAnimations], a
+	ldh [hSCX], a
+	ldh [hSCY], a
+	ldh [hWY], a
+	call ClearScreen
+	call DisableLCD
+	call LoadFontTilePatterns    ; Critical: loads font for text display
+	call ClearBothBGMaps
+	call EnableLCD
+	call GBPalNormal             ; Set up palettes
+	
+	; Now jump to game (skip title screen display and main menu)
+	ld hl, wStatusFlags6
+	set BIT_DEBUG_MODE, [hl]
+	farjp StartNewGameDebug
 
 DisplayTitleScreen:
 	call GBPalWhiteOut
@@ -410,7 +432,7 @@ IF DEF(_BLUE)
 ENDC
 
 DebugNewGamePlayerName:
-	db "NINTEN@"
+	db "GENE AI@"
 
 DebugNewGameRivalName:
-	db "SONY@"
+	db "GARY@"
