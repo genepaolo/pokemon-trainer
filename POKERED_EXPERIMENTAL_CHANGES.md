@@ -949,7 +949,7 @@ Then use Option 2 to make debug mode use it.
 
 ### Optimized Debug Runner (ppew_debug_optimized.py)
 
-**Purpose**: High-performance game runner with interactive controls and clean UI for development and training.
+**Purpose**: High-performance game runner with modular overlay system for development, debugging, and training.
 
 **File**: `env/ppew_debug_optimized.py`
 
@@ -966,39 +966,77 @@ Then use Option 2 to make debug mode use it.
    - **Interactive Mode** (`--pyboy-window`): PyBoy SDL2 window handles arrow key input naturally
    - **Headless Mode** (default): No window, no controls, maximum speed for training
 
-3. **Clean Side Panel UI**:
-   - Game screen on left (no overlay clutter)
-   - Stats panel on right with:
-     - FPS counter
-     - Frame count
-     - Player position (X, Y)
+3. **Modular Overlay System**:
+   Three independent visualization overlays that can be enabled individually or in combination:
+
+   - **Info Panel** (`--info`): Stats panel on right side with:
+     - FPS counter and frame count
+     - Player position (X, Y in tiles)
      - Map ID
      - Steps taken
      - Maps visited count
+     - Movement statistics
      - Controls guide
-   - Dark theme with green monospace text
-   - Box-drawing characters for professional look
+     - Dark theme with green monospace text
+     - Box-drawing characters for professional look
+
+   - **Tile Grid** (`--tiles`): Visual grid overlay showing:
+     - 16x16 pixel tile boundaries (10 tiles wide × 9 tiles tall)
+     - Green semi-transparent grid lines matching info panel color
+     - **Dynamic world-aligned grid**: Uses scroll registers (SCX/SCY) to keep grid aligned with world tiles
+     - Grid moves with the background as player walks, showing actual tile boundaries
+     - Helps understand game's visual tile-based coordinate system
+     - Useful for debugging movement and collision detection
+
+   - **Direction Arrows** (`--dir`): Movement history visualization:
+     - Green arrows showing recent movements (last 100)
+     - One arrow per tile (latest movement overrides previous)
+     - **Arrows precisely centered within grid tiles** using:
+       - Geometric midpoint calculation (arrow_start = tile_center - arrow_length/2)
+       - Direction-based offset compensation (ARROW_DIRECTION_OFFSET = -2)
+     - Fade effect based on recency (older = more transparent)
+     - Only shows arrows for current map
+     - Scrolls with player position as screen moves
+     - Magenta dashed rectangle shows current player tile for alignment verification
+     - Helps visualize exploration patterns and navigation behavior
 
 4. **Command Line Interface**:
    ```bash
-   # Default: headless with side panel at 60fps
-   python env/ppew_debug_optimized.py
+   # Default: headless, no overlays, 60fps
+   python3 env/ppew_debug_optimized.py
 
    # Interactive mode with PyBoy window (use arrow keys in PyBoy window)
-   python env/ppew_debug_optimized.py --pyboy-window
+   python3 env/ppew_debug_optimized.py --pyboy-window
+
+   # Interactive with info panel
+   python3 env/ppew_debug_optimized.py --pyboy-window --info
+
+   # Interactive with tile grid overlay
+   python3 env/ppew_debug_optimized.py --pyboy-window --tiles
+
+   # Interactive with direction arrows
+   python3 env/ppew_debug_optimized.py --pyboy-window --dir
+
+   # All overlays combined
+   python3 env/ppew_debug_optimized.py --pyboy-window --info --tiles --dir
+
+   # Debug overlay without PyBoy window (for watching RL agent)
+   python3 env/ppew_debug_optimized.py --info --tiles --dir
 
    # Maximum speed for training (no display at all)
-   python env/ppew_debug_optimized.py --no-overlay --fps 0
+   python3 env/ppew_debug_optimized.py --fps 0
 
    # Timed runs for benchmarking
-   python env/ppew_debug_optimized.py --duration 60 --fps 0
-   python env/ppew_debug_optimized.py --frames 10000 --no-overlay
+   python3 env/ppew_debug_optimized.py --duration 60 --fps 0
+   python3 env/ppew_debug_optimized.py --frames 10000 --fps 0
    ```
 
    **Available Arguments**:
    - `--rom PATH`: ROM file path (default: pokered_experimental/pokeblue.gbc)
    - `--pyboy-window`: Show PyBoy SDL2 window for interactive play with arrow keys
-   - `--no-overlay`: Disable matplotlib side panel overlay
+   - `--info`: Show info panel with game statistics
+   - `--tiles`: Show tile grid overlay (16x16 pixel grid)
+   - `--dir`: Show movement direction arrows
    - `--overlay-rate N`: Update overlay every N frames (default: 2)
    - `--fps N`: Max FPS, 0=unlimited (default: 60)
    - `--duration SECONDS`: Run for N seconds then exit
@@ -1076,15 +1114,17 @@ runner.run(max_frames=10000)
 | Feature | ppew_debug.py | ppew_debug_optimized.py |
 |---------|---------------|-------------------------|
 | Display Mode | SDL2 + matplotlib | Headless (default) or SDL2 (optional) |
-| Overlay | On screen (clutters gameplay) | Side panel (clean separation) |
+| Overlay | On screen (clutters gameplay) | Modular system (info/tiles/dir flags) |
+| Visualization | Debug info only | Info panel + tile grid + direction arrows |
 | Controls | PyBoy SDL2 window (arrow keys) | PyBoy SDL2 window when `--pyboy-window` used |
 | Input Method | PyBoy handles naturally | PyBoy handles naturally (when window shown) |
 | Plot Updates | ax.clear() + ax.imshow() | img_plot.set_data() |
 | FPS | ~20-25 | ~60 (default) or unlimited |
 | PIL Conversions | Every frame | Only when overlay enabled |
-| Configurability | Limited | Extensive CLI options |
+| Configurability | Limited | Extensive CLI options + modular overlays |
 | Training Suitability | Poor (slow, always shows SDL2) | Excellent (fast, headless mode) |
 | Interactive Play | Yes (SDL2 window) | Yes (`--pyboy-window` flag) |
+| Debugging Tools | Basic info | Tile grid + movement tracking + stats |
 
 ---
 
@@ -1121,19 +1161,22 @@ When making additional modifications to `pokered_experimental`:
 
 ```bash
 # Interactive play (use arrow keys in PyBoy window)
-python env/ppew_debug_optimized.py --pyboy-window
+python3 env/ppew_debug_optimized.py --pyboy-window
 
-# Headless with stats display (default)
-python env/ppew_debug_optimized.py
+# Interactive with all debug overlays
+python3 env/ppew_debug_optimized.py --pyboy-window --info --tiles --dir
+
+# Headless with visualization (watch RL agent learn)
+python3 env/ppew_debug_optimized.py --info --tiles --dir
+
+# Debug movement and tiles (no info panel)
+python3 env/ppew_debug_optimized.py --pyboy-window --tiles --dir
 
 # Maximum speed training mode (no display)
-python env/ppew_debug_optimized.py --no-overlay --fps 0
-
-# Interactive with both PyBoy window and matplotlib side panel
-python env/ppew_debug_optimized.py --pyboy-window
+python3 env/ppew_debug_optimized.py --fps 0
 
 # Benchmark for 10,000 frames
-python env/ppew_debug_optimized.py --frames 10000 --no-overlay --fps 0
+python3 env/ppew_debug_optimized.py --frames 10000 --fps 0
 ```
 
 ### Use Cases
@@ -1141,8 +1184,9 @@ python env/ppew_debug_optimized.py --frames 10000 --no-overlay --fps 0
 | Use Case | Command | Why |
 |----------|---------|-----|
 | **Playing the game** | `--pyboy-window` | Shows PyBoy window, use arrow keys to play |
-| **Watching RL agent** | Default (no flags) | Headless with matplotlib side panel showing stats |
-| **Training RL agent** | `--no-overlay --fps 0` | Maximum speed, no visual output |
-| **Debugging** | `--pyboy-window` | Interactive play with full control |
-| **Performance testing** | `--frames 10000 --no-overlay --fps 0` | Benchmark mode |
+| **Debugging movement** | `--pyboy-window --tiles --dir` | See tile boundaries and movement history |
+| **Watching RL agent** | `--info --tiles --dir` | Visualize agent exploration with stats |
+| **Understanding tiles** | `--pyboy-window --tiles` | See how the game divides screen into tiles |
+| **Training RL agent** | `--fps 0` | Maximum speed, no visual output |
+| **Performance testing** | `--frames 10000 --fps 0` | Benchmark mode |
 

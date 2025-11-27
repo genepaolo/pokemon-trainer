@@ -170,3 +170,195 @@ To isolate a map for training, **remove all connections**.
 
 This creates a small, contained environment perfect for training navigation!
 
+---
+
+## Creating a Walking Simulator (No Battles, No NPCs)
+
+This section covers how to create a pure walking simulator for RL training by disabling wild pokemon encounters, removing NPCs, and setting up multi-map navigation.
+
+### Disable Wild Pokemon Battles
+
+**File**: `pokered_experimental/data/wild/grass_water.asm`
+
+The `WildDataPointers` table maps each map to its wild pokemon data. To disable encounters on any route or map, change its entry to `NothingWildMons`:
+
+**Example for Route 1** (line 15):
+```asm
+; BEFORE
+dw Route1WildMons          ; ROUTE_1
+
+; AFTER
+dw NothingWildMons         ; ROUTE_1 - No wild encounters
+```
+
+**What `NothingWildMons` does**:
+```asm
+NothingWildMons:
+    def_grass_wildmons 0 ; encounter rate = 0
+    end_grass_wildmons
+    def_water_wildmons 0 ; encounter rate = 0
+    end_water_wildmons
+```
+
+**Key Points**:
+- Setting a route to `NothingWildMons` disables encounters even if grass tiles exist
+- You don't need to remove grass tiles from the .blk file
+- This works for any map (routes, towns, cities)
+
+### Remove NPCs from Maps
+
+**File**: `pokered_experimental/data/maps/objects/[MapName].asm`
+
+Remove or comment out the `def_object_events` section:
+
+**Example for Pallet Town**:
+```asm
+; BEFORE
+def_object_events
+    object_event  8,  5, SPRITE_OAK, STAY, NONE, TEXT_PALLETTOWN_OAK
+    object_event  3,  8, SPRITE_GIRL, WALK, ANY_DIR, TEXT_PALLETTOWN_GIRL
+    object_event 11, 14, SPRITE_FISHER, WALK, ANY_DIR, TEXT_PALLETTOWN_FISHER
+
+; AFTER
+def_object_events
+    ; No NPCs - removed for RL training
+```
+
+**Example for Route 1**:
+```asm
+; BEFORE
+def_object_events
+    object_event  5, 24, SPRITE_YOUNGSTER, WALK, UP_DOWN, TEXT_ROUTE1_YOUNGSTER1
+    object_event 15, 13, SPRITE_YOUNGSTER, WALK, LEFT_RIGHT, TEXT_ROUTE1_YOUNGSTER2
+
+; AFTER
+def_object_events
+    ; No NPCs - removed for RL training
+```
+
+**Key Points**:
+- Empty `def_object_events` section removes all NPCs
+- This also removes trainers (no forced battles)
+- NPCs won't spawn even if the .blk file has space for them
+
+### Remove Grass Tiles (Optional)
+
+**Note**: Grass tiles are defined in the `.blk` file (binary), so you can't easily edit them directly. However:
+
+- **You don't need to remove grass tiles** - setting wild pokemon to `NothingWildMons` prevents encounters even if grass tiles exist
+- **If you want to remove grass visually**, you can:
+  - Copy a map without grass (like an indoor map) as your template
+  - Use a town/city map that has minimal grass
+  - The grass will still be there visually, but encounters are disabled
+
+### Multi-Map Setup (Town → Route → Town)
+
+To create a walking trainer that can navigate between multiple maps:
+
+#### Step 1: Set Up Map Connections
+
+**File**: `pokered_experimental/data/maps/headers/PalletTown.asm`
+```asm
+map_header PalletTown, PALLET_TOWN, OVERWORLD, NORTH
+connection north, Route1, ROUTE_1, 0
+end_map_header
+```
+
+**File**: `pokered_experimental/data/maps/headers/Route1.asm`
+```asm
+map_header Route1, ROUTE_1, OVERWORLD, NORTH | SOUTH
+connection south, PalletTown, PALLET_TOWN, 0
+connection north, ViridianCity, VIRIDIAN_CITY, -5
+end_map_header
+```
+
+**File**: `pokered_experimental/data/maps/headers/ViridianCity.asm`
+```asm
+map_header ViridianCity, VIRIDIAN_CITY, OVERWORLD, SOUTH
+connection south, Route1, ROUTE_1, 5
+end_map_header
+```
+
+#### Step 2: Disable Wild Pokemon on Routes
+
+**File**: `pokered_experimental/data/wild/grass_water.asm` (line 15):
+```asm
+dw NothingWildMons         ; ROUTE_1 - No wild encounters for RL training
+```
+
+#### Step 3: Remove NPCs from All Maps
+
+Remove NPCs from:
+- `data/maps/objects/PalletTown.asm`
+- `data/maps/objects/Route1.asm`
+- `data/maps/objects/ViridianCity.asm`
+
+Set all `def_object_events` sections to empty:
+```asm
+def_object_events
+    ; No NPCs - removed for RL training
+```
+
+#### Step 4: Set Starting Location
+
+**File**: `pokered_experimental/data/maps/special_warps.asm` (line 47-48):
+```asm
+NewGameWarp:
+    special_warp_spec PALLET_TOWN, 5, 6, OVERWORLD
+```
+
+### Complete Example: Pallet Town → Route 1 → Viridian City
+
+Here's a complete setup for a three-map walking simulator:
+
+1. **Disable Wild Pokemon on Route 1**
+   - File: `pokered_experimental/data/wild/grass_water.asm` (line 15)
+   - Change: `dw Route1WildMons` → `dw NothingWildMons`
+
+2. **Remove NPCs from Pallet Town**
+   - File: `pokered_experimental/data/maps/objects/PalletTown.asm`
+   - Empty the `def_object_events` section
+
+3. **Remove NPCs from Route 1**
+   - File: `pokered_experimental/data/maps/objects/Route1.asm`
+   - Empty the `def_object_events` section
+
+4. **Remove NPCs from Viridian City**
+   - File: `pokered_experimental/data/maps/objects/ViridianCity.asm`
+   - Empty the `def_object_events` section
+
+5. **Verify Map Connections**
+   - Check that header files have proper connections (they should already be set)
+
+6. **Set Starting Location**
+   - File: `pokered_experimental/data/maps/special_warps.asm`
+   - Set `NewGameWarp` to start in Pallet Town
+
+**Result**: A three-map walking simulator where the agent can:
+- Start in Pallet Town
+- Walk north to Route 1 (no wild pokemon encounters)
+- Walk north to Viridian City
+- Navigate back and forth between all three maps
+- No NPCs, no battles, no forced encounters
+
+### Quick Reference Table
+
+| Task | Solution | File |
+|------|----------|------|
+| **Disable wild pokemon** | Change to `NothingWildMons` | `data/wild/grass_water.asm` |
+| **Remove NPCs** | Empty `def_object_events` | `data/maps/objects/[Map].asm` |
+| **Remove grass tiles** | Not needed (set encounters to 0) | N/A (or copy non-grass .blk) |
+| **Multi-map setup** | Set connections + disable encounters + remove NPCs | Multiple files |
+
+### Recommended Approach
+
+For RL training, the simplest approach is:
+
+1. **Use existing maps** (Pallet Town, Route 1, Viridian City)
+2. **Disable wild pokemon** on Route 1 by setting it to `NothingWildMons`
+3. **Remove NPCs** from all three maps
+4. **Keep map connections** so the agent can travel between them
+5. **Set starting location** to Pallet Town
+
+This gives you a working three-map walking simulator with no battles or NPCs, perfect for training navigation RL agents.
+
