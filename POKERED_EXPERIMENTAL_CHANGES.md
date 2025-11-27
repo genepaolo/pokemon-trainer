@@ -947,11 +947,11 @@ Then use Option 2 to make debug mode use it.
 
 ## Python Environment Improvements
 
-### Optimized Debug Runner (ppew_debug_optimized.py)
+### Debug Runner (ppew_debug.py)
 
 **Purpose**: High-performance game runner with modular overlay system for development, debugging, and training.
 
-**File**: `env/ppew_debug_optimized.py`
+**File**: `env/ppew_debug.py`
 
 **Key Features**:
 
@@ -1003,32 +1003,32 @@ Then use Option 2 to make debug mode use it.
 4. **Command Line Interface**:
    ```bash
    # Default: headless, no overlays, 60fps
-   python3 env/ppew_debug_optimized.py
+   python3 env/ppew_debug.py
 
    # Interactive mode with PyBoy window (use arrow keys in PyBoy window)
-   python3 env/ppew_debug_optimized.py --pyboy-window
+   python3 env/ppew_debug.py --pyboy-window
 
    # Interactive with info panel
-   python3 env/ppew_debug_optimized.py --pyboy-window --info
+   python3 env/ppew_debug.py --pyboy-window --info
 
    # Interactive with tile grid overlay
-   python3 env/ppew_debug_optimized.py --pyboy-window --tiles
+   python3 env/ppew_debug.py --pyboy-window --tiles
 
    # Interactive with direction arrows
-   python3 env/ppew_debug_optimized.py --pyboy-window --dir
+   python3 env/ppew_debug.py --pyboy-window --dir
 
    # All overlays combined
-   python3 env/ppew_debug_optimized.py --pyboy-window --info --tiles --dir
+   python3 env/ppew_debug.py --pyboy-window --info --tiles --dir
 
    # Debug overlay without PyBoy window (for watching RL agent)
-   python3 env/ppew_debug_optimized.py --info --tiles --dir
+   python3 env/ppew_debug.py --info --tiles --dir
 
    # Maximum speed for training (no display at all)
-   python3 env/ppew_debug_optimized.py --fps 0
+   python3 env/ppew_debug.py --fps 0
 
    # Timed runs for benchmarking
-   python3 env/ppew_debug_optimized.py --duration 60 --fps 0
-   python3 env/ppew_debug_optimized.py --frames 10000 --fps 0
+   python3 env/ppew_debug.py --duration 60 --fps 0
+   python3 env/ppew_debug.py --frames 10000 --fps 0
    ```
 
    **Available Arguments**:
@@ -1047,13 +1047,12 @@ Then use Option 2 to make debug mode use it.
    - Console statistics every 5 seconds
    - Final report on exit with total stats
 
-**Performance Comparison**:
-| Configuration | FPS | Speed vs Original |
-|--------------|-----|-------------------|
-| Original ppew_debug.py | ~20-25 FPS | 1x baseline |
-| Optimized (default) | ~60 FPS | 2.5x faster |
-| Optimized (no overlay, 60fps) | ~60 FPS | 2.5x faster |
-| Optimized (no overlay, unlimited) | ~300-500 FPS | 15-20x faster |
+**Performance**:
+| Configuration | FPS |
+|--------------|-----|
+| Default (60fps cap) | ~60 FPS |
+| No overlay, 60fps | ~60 FPS |
+| No overlay, unlimited | ~300-500 FPS |
 
 **Technical Implementation**:
 
@@ -1089,12 +1088,14 @@ Then use Option 2 to make debug mode use it.
 
 **Usage in Training**:
 ```python
-from env.ppew_debug_optimized import OptimizedDebugRunner
+from env.ppew_debug import OptimizedDebugRunner
 
 # For development/testing
 runner = OptimizedDebugRunner(
     rom_path="pokered_experimental/pokeblue.gbc",
-    show_overlay=True,
+    show_info=True,
+    show_tiles=True,
+    show_dir=True,
     max_fps=60
 )
 runner.run()
@@ -1102,29 +1103,11 @@ runner.run()
 # For training (maximum speed)
 runner = OptimizedDebugRunner(
     rom_path="pokered_experimental/pokeblue.gbc",
-    show_overlay=False,
     max_fps=0,
     print_stats=True
 )
 runner.run(max_frames=10000)
 ```
-
-**Comparison with Original ppew_debug.py**:
-
-| Feature | ppew_debug.py | ppew_debug_optimized.py |
-|---------|---------------|-------------------------|
-| Display Mode | SDL2 + matplotlib | Headless (default) or SDL2 (optional) |
-| Overlay | On screen (clutters gameplay) | Modular system (info/tiles/dir flags) |
-| Visualization | Debug info only | Info panel + tile grid + direction arrows |
-| Controls | PyBoy SDL2 window (arrow keys) | PyBoy SDL2 window when `--pyboy-window` used |
-| Input Method | PyBoy handles naturally | PyBoy handles naturally (when window shown) |
-| Plot Updates | ax.clear() + ax.imshow() | img_plot.set_data() |
-| FPS | ~20-25 | ~60 (default) or unlimited |
-| PIL Conversions | Every frame | Only when overlay enabled |
-| Configurability | Limited | Extensive CLI options + modular overlays |
-| Training Suitability | Poor (slow, always shows SDL2) | Excellent (fast, headless mode) |
-| Interactive Play | Yes (SDL2 window) | Yes (`--pyboy-window` flag) |
-| Debugging Tools | Basic info | Tile grid + movement tracking + stats |
 
 ---
 
@@ -1155,28 +1138,28 @@ When making additional modifications to `pokered_experimental`:
 
 ---
 
-## Quick Reference: Running the Optimized Debug Runner
+## Quick Reference: Running the Debug Runner
 
 ### Common Commands
 
 ```bash
 # Interactive play (use arrow keys in PyBoy window)
-python3 env/ppew_debug_optimized.py --pyboy-window
+python3 env/ppew_debug.py --pyboy-window
 
 # Interactive with all debug overlays
-python3 env/ppew_debug_optimized.py --pyboy-window --info --tiles --dir
+python3 env/ppew_debug.py --pyboy-window --info --tiles --dir
 
 # Headless with visualization (watch RL agent learn)
-python3 env/ppew_debug_optimized.py --info --tiles --dir
+python3 env/ppew_debug.py --info --tiles --dir
 
 # Debug movement and tiles (no info panel)
-python3 env/ppew_debug_optimized.py --pyboy-window --tiles --dir
+python3 env/ppew_debug.py --pyboy-window --tiles --dir
 
 # Maximum speed training mode (no display)
-python3 env/ppew_debug_optimized.py --fps 0
+python3 env/ppew_debug.py --fps 0
 
 # Benchmark for 10,000 frames
-python3 env/ppew_debug_optimized.py --frames 10000 --fps 0
+python3 env/ppew_debug.py --frames 10000 --fps 0
 ```
 
 ### Use Cases
