@@ -29,6 +29,8 @@ This document tracks all modifications made to the `pokered_experimental` disass
    - [Summary of All Changes](#summary-of-all-changes)
    - [Notes for Future Changes](#notes-for-future-changes)
 
+3. [Walker Map - Isolated Training Environment](#walker-map---isolated-training-environment)
+
 ---
 
 # Pre-Oak Speech Flow - Game Initialization (Original Documentation)
@@ -1144,6 +1146,36 @@ When making additional modifications to `pokered_experimental`:
 4. **Keep this documentation updated** as the project evolves
 
 5. **For Python environment changes**: Test performance with benchmarks before and after modifications
+
+---
+
+## Walker Map - Isolated Training Environment
+
+An isolated 3-map walking simulator has been created for RL training. This provides a controlled environment with no NPCs, no wild Pokémon battles, and limited map exits.
+
+**See full documentation:** [`POKERED_EXPERIMENTAL_WALKER_MAP.md`](POKERED_EXPERIMENTAL_WALKER_MAP.md)
+
+### Quick Summary
+
+**Maps Included:**
+- Pallet Town (start) → Route 1 → Viridian City (end)
+
+**Changes Made:**
+
+| File | Change |
+|------|--------|
+| `data/maps/headers/PalletTown.asm` | Removed south connection (Route 21) |
+| `data/maps/objects/PalletTown.asm` | Removed 3 NPCs (Oak, Girl, Fisher) |
+| `scripts/PalletTown.asm` | Added `ret` to skip Oak encounter |
+| `data/maps/objects/Route1.asm` | Removed 2 NPCs (Youngsters) |
+| `data/wild/grass_water.asm` | Disabled wild Pokémon on Route 1 |
+| `data/maps/headers/ViridianCity.asm` | Removed north/west connections |
+| `data/maps/objects/ViridianCity.asm` | Removed 7 NPCs |
+
+**Key Learnings:**
+1. Header connection flags MUST match actual connections defined
+2. Keep `const_export` lines even when removing NPCs (scripts reference them)
+3. Scripts are separate from sprites - removing Oak sprite doesn't disable his cutscene
 
 ---
 
