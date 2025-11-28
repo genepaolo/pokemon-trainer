@@ -159,6 +159,10 @@ class OptimizedDebugRunner:
         # Pre-create game screen image
         dummy_img = np.zeros((144, 160, 3), dtype=np.uint8)
         self.img_plot = self.ax_game.imshow(dummy_img, interpolation='nearest', zorder=1)
+        
+        # Fix axis limits to prevent shrinking when arrows are added
+        self.ax_game.set_xlim(-0.5, self.SCREEN_WIDTH - 0.5)
+        self.ax_game.set_ylim(self.SCREEN_HEIGHT - 0.5, -0.5)  # Inverted for image coordinates
 
         # Setup info panel if enabled
         if self.show_info:
@@ -236,21 +240,42 @@ class OptimizedDebugRunner:
         pos = self.env._get_player_position()
         map_id = self.env._get_map_id()
 
-        # Track current tile as visited
-        tile_key = (pos[0], pos[1], map_id)
-        self.visited_tiles[tile_key] = self.visited_tiles.get(tile_key, 0) + 1
-
         # Track movement if position changed
         if self.prev_pos is not None and self.prev_map == map_id:
             prev_x, prev_y = self.prev_pos
             curr_x, curr_y = pos
 
-            # Only track if actually moved
+            # Only track if actually moved to a new tile
             if (prev_x, prev_y) != (curr_x, curr_y):
                 self.movement_history.append((prev_x, prev_y, curr_x, curr_y, map_id))
+                
+                # Track visit count only when entering a NEW tile (not every frame)
+                tile_key = (curr_x, curr_y, map_id)
+                self.visited_tiles[tile_key] = self.visited_tiles.get(tile_key, 0) + 1
+        elif self.prev_pos is None:
+            # First frame - initialize the starting tile with 1 visit
+            tile_key = (pos[0], pos[1], map_id)
+            self.visited_tiles[tile_key] = 1
 
         self.prev_pos = pos
         self.prev_map = map_id
+
+    def _get_visit_color(self, visit_count):
+        """Get color based on visit count (green → yellow → orange → red)
+        
+        1 visit:     Green  (#00ff00)
+        2-3 visits:  Yellow (#ffff00)
+        4-6 visits:  Orange (#ff8000)
+        7+ visits:   Red    (#ff0000)
+        """
+        if visit_count <= 1:
+            return '#00ff00'  # Green - first visit
+        elif visit_count <= 3:
+            return '#ffff00'  # Yellow - revisited
+        elif visit_count <= 6:
+            return '#ff8000'  # Orange - frequently visited
+        else:
+            return '#ff0000'  # Red - heavily trafficked
 
     def _draw_direction_arrows(self):
         """Draw arrows showing movement history (one arrow per tile, latest overrides)
@@ -260,6 +285,12 @@ class OptimizedDebugRunner:
         1. Get current player position (map tile coords)
         2. For each historical movement, calculate the tile's offset from current player position
         3. Draw the arrow at screen_center + offset_in_pixels
+        
+        Arrow color indicates visit count:
+        - Green: 1 visit (first time)
+        - Yellow: 2-3 visits
+        - Orange: 4-6 visits
+        - Red: 7+ visits (heavily trafficked)
         """
         if not self.show_dir:
             return
@@ -335,16 +366,22 @@ class OptimizedDebugRunner:
             arrow_start_x = from_screen_px - arrow_dx / 2 + offset_x
             arrow_start_y = from_screen_py - arrow_dy / 2 + offset_y
 
-            # Color based on recency (newer = brighter)
-            alpha = 0.4 + (index / len(self.movement_history)) * 0.5
+            # Get visit count for this tile to determine color
+            tile_key = (from_x, from_y, current_map)
+            visit_count = self.visited_tiles.get(tile_key, 1)
+            arrow_color = self._get_visit_color(visit_count)
 
-            # Draw arrow centered on the tile
+            # Alpha based on recency (newer = more opaque)
+            alpha = 0.6 + (index / len(self.movement_history)) * 0.4
+
+            # Draw arrow with black outline for visibility
             arrow = self.ax_game.arrow(
                 arrow_start_x, arrow_start_y, arrow_dx, arrow_dy,
                 head_width=head_width, head_length=head_length,
-                fc='#00ff00', ec='#00ff00',
+                fc=arrow_color,      # Fill color based on visit count
+                ec='#000000',        # Black outline
                 alpha=alpha,
-                linewidth=2.0,
+                linewidth=1.5,       # Outline thickness
                 zorder=3
             )
             self.arrow_patches.append(arrow)
@@ -438,6 +475,10 @@ class OptimizedDebugRunner:
         ]
 
         if self.show_dir:
+            # Calculate max visits for current map
+            map_visits = [v for (x, y, m), v in self.visited_tiles.items() if m == map_id]
+            max_visits = max(map_visits) if map_visits else 0
+            
             stats_lines.extend([
                 "",
                 "╔══════════════════════╗",
@@ -446,6 +487,13 @@ class OptimizedDebugRunner:
                 "",
                 f"🔵 Tiles (This Map): {unique_tiles_visited}",
                 f"➡️  Movements: {total_movements}",
+                f"🔥 Max Visits: {max_visits}",
+                "",
+                "Arrow Colors:",
+                "  🟢 Green:  1 visit",
+                "  🟡 Yellow: 2-3 visits",
+                "  🟠 Orange: 4-6 visits",
+                "  🔴 Red:    7+ visits",
             ])
 
         stats_lines.extend([

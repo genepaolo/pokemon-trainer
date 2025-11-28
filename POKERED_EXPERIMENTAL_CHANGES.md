@@ -989,16 +989,25 @@ Then use Option 2 to make debug mode use it.
      - Useful for debugging movement and collision detection
 
    - **Direction Arrows** (`--dir`): Movement history visualization:
-     - Green arrows showing recent movements (last 100)
+     - Arrows showing recent movements (last 100)
      - One arrow per tile (latest movement overrides previous)
+     - **Color gradient based on visit count**:
+       - 🟢 Green: 1 visit (first time on tile)
+       - 🟡 Yellow: 2-3 visits
+       - 🟠 Orange: 4-6 visits  
+       - 🔴 Red: 7+ visits (heavily trafficked areas)
+     - **Black outline** on all arrows for visibility against game background
      - **Arrows precisely centered within grid tiles** using:
        - Geometric midpoint calculation (arrow_start = tile_center - arrow_length/2)
        - Direction-based offset compensation (ARROW_DIRECTION_OFFSET = -2)
+     - Visit count tracked only on tile entry (not every frame)
      - Fade effect based on recency (older = more transparent)
      - Only shows arrows for current map
      - Scrolls with player position as screen moves
      - Magenta dashed rectangle shows current player tile for alignment verification
-     - Helps visualize exploration patterns and navigation behavior
+     - Fixed axis limits prevent screen shrinking when arrows go off-screen
+     - Info panel shows color legend and max visit count when enabled
+     - Helps visualize exploration patterns and identify heavily revisited areas
 
 4. **Command Line Interface**:
    ```bash

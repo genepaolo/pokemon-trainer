@@ -19,6 +19,7 @@ PalletTown_ScriptPointers:
 	dw_const PalletTownNoopScript,                 SCRIPT_PALLETTOWN_NOOP
 
 PalletTownDefaultScript:
+	ret ; RL Training: Skip Oak encounter entirely
 	CheckEvent EVENT_FOLLOWED_OAK_INTO_LAB
 	ret nz
 	ld a, [wYCoord]
