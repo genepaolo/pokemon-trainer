@@ -565,6 +565,10 @@ class OptimizedDebugRunner:
             self.env.pyboy.tick()
         print("✅ Game loaded!\n")
 
+        # Initialize state with actual starting position
+        self.env.state['curr_pos'] = self.env._get_player_position()
+        self.env.state['visited_maps'].add(self.env._get_map_id())
+
         self.start_time = time.time()
         target_frame_time = 1.0 / self.max_fps if self.max_fps > 0 else 0
 
@@ -572,6 +576,29 @@ class OptimizedDebugRunner:
             while self.env.pyboy.tick():
                 frame_start = time.time()
                 self.frame_count += 1
+
+                # Update state tracking on every frame
+                curr_pos = self.env._get_player_position()  # Returns (x, y) tuple
+                curr_map = self.env._get_map_id()
+
+                # Update visited maps
+                self.env.state['visited_maps'].add(curr_map)
+
+                # Check if position changed (handle both tuple and array comparisons)
+                prev_state_pos = self.env.state.get('curr_pos')
+                if prev_state_pos is not None:
+                    # Convert to tuple for safe comparison
+                    if isinstance(prev_state_pos, np.ndarray):
+                        prev_tuple = tuple(prev_state_pos)
+                    else:
+                        prev_tuple = prev_state_pos
+
+                    # Increment steps only if position actually changed
+                    if curr_pos != prev_tuple:
+                        self.env.state['steps'] += 1
+
+                # Update current position
+                self.env.state['curr_pos'] = curr_pos
 
                 # Update overlay at reduced rate
                 if self.show_overlay and (self.frame_count % self.overlay_refresh_rate == 0):

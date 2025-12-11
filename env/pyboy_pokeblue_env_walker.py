@@ -27,9 +27,11 @@ Key Design Questions:
     - When the player fails
 """
 
+from typing import Any
 import pyboy
 import gymnasium as gym
 import numpy as np
+import io
 from PIL import Image, ImageDraw, ImageFont
 
 class PyBoyPokeBlueEnvWalker(gym.Env):
@@ -64,12 +66,26 @@ class PyBoyPokeBlueEnvWalker(gym.Env):
             'visited_maps': set(),
             'prev_pos': None,
             'curr_pos': np.array([0, 0]),
+            'curr_map_id': 0,
+            'goal': {
+                'map_id' : 1,
+                'pos': np.array([18,0])
+            }
         }
         self.max_steps = 10000
 
         # Debug Overlay
         self.debug_overlay = debug_overlay
         self.font = ImageFont.load_default()
+
+        # Save State
+         # Wait for game to load to your starting point...
+        # (you'd tick until player is in position)
+        # Wait for game to fully load (skip intro, get to player control)
+        for _ in range(1000):  # Adjust based on when you have control
+            self.pyboy.tick()
+        self.initial_state = io.BytesIO()
+        self.pyboy.save_state(self.initial_state)
 
     """
     Pyboy Memory Helper Functions
@@ -84,7 +100,7 @@ class PyBoyPokeBlueEnvWalker(gym.Env):
 
     def _get_player_position(self):
         # Get the player's position
-        return self.pyboy.memory[self.ADDRESS_X_COORD], self.pyboy.memory[self.ADDRESS_Y_COORD]
+        return np.array([self.pyboy.memory[self.ADDRESS_X_COORD], self.pyboy.memory[self.ADDRESS_Y_COORD] ])
     
     """
 
@@ -94,30 +110,55 @@ class PyBoyPokeBlueEnvWalker(gym.Env):
 
     def _get_observation(self):
         # Get the observation
+        x, y = self._get_player_position()
         return {
-            'curr_pos': self.observation_space['curr_pos'],
-            'map_id': self.observation_space['map_id'],
-        }
-    
-    def reset(self):
-        # Reset the Env
-        self.pyboy.reset()
-        # Getting additiona info from state before resetting
-        info = {
-            'steps': self.state['steps'],
-            'visited_map_count': len(self.state['visited_maps']),
+            'curr_pos': np.array([x, y], dtype=np.uint8),
+            'map_id': self._get_map_id(),
         }
 
-        # Reset State
+        # WRONG: Type Schema/Contract that says "Observations will be X,Y coords (0-255) and map ID (0-255)"
+        # only call at init/validation time!, self.observation_space is not where the data lives
+        # return {
+        # 'curr_pos': self.observation_space['curr_pos'],  # This is gym.spaces.Box(...)
+        # 'map_id': self.observation_space['map_id'],      # This is gym.spaces.Discrete(256)
+        # }
+
+    def reset(self):
+        # Getting additiona info from state before resetting
+        # Restore to initial state
+        self.initial_state.seek(0)
+        self.pyboy.load_state(self.initial_state)
+        
+        # Reset internal tracking
         self.state = {
             'steps': 0,
-            'visited_maps': set(),
+            'visited_maps': set[Any](),
             'prev_pos': None,
-            'curr_pos': np.array([0, 0]),
+            'curr_pos': self._get_player_position(),
         }
-        # Return Observation with additional info
+        
         obs = self._get_observation()
+        info = {}
         return obs, info
+    
+    # def reset(self):
+    #     # Getting additiona info from state before resetting
+    #     info = {
+    #         'steps': self.state['steps'],
+    #         'visited_map_count': len(self.state['visited_maps']),
+    #     }
+
+    #     # Reset State
+    #     self.state = {
+    #         'steps': 0,
+    #         'visited_maps': set(),
+    #         'prev_pos': None,
+    #         'curr_pos': np.array([0, 0]),
+    #     }
+    #     # Return Observation with additional info
+    #     obs = self._get_observation()
+    #     return obs, info
+
 
     def step(self, action):
         """Execute action and return (obs, reward, done, truncated, info)"""
@@ -128,22 +169,36 @@ class PyBoyPokeBlueEnvWalker(gym.Env):
             2: pyboy.WindowEvent.PRESS_ARROW_LEFT,
             3: pyboy.WindowEvent.PRESS_ARROW_RIGHT,
         }
+
         button = button_map[action]
+
         self.pyboy.send_input(button)
-        # Run emulation for a few frames and calculate new state
-        for _ in range(10):
+        for _ in range(5):
             self.pyboy.tick()
+        self.pyboy.send_input(pyboy.WindowEvent.RELEASE_ARROW_UP)  # Or release the specific button
+        for _ in range(5):
+            self.pyboy.tick()
+
         self.state['steps'] += 1
         self.state['prev_pos'] = self.state['curr_pos']
         self.state['curr_pos'] = self._get_player_position()
         self.state['visited_maps'].add(self._get_map_id())
+        self.staste['curr_map_id'] = self._get_map_id()
 
         # Calculate rewards based on state 
         reward = self._calculate_reward() 
 
         #Check Termination Conditions
-        termianted = False
-        truncated = self
+        terminated = False
+        truncated = self.state['steps'] >= self.max_steps
+        obs = self._get_observation()
+        info = self._get_info()
+        return obs, reward, terminated, truncated, info
+
+    def _calculate_reward(self):
+        # Calculate the reward
+        # Will update later!
+        return 1 if (self.state['curr_pos'] == self.state['goal']['pos'] & self.state['curr_map_id'] == self.state['goal']['map_id']) else 0
         
     """
 
@@ -151,7 +206,7 @@ class PyBoyPokeBlueEnvWalker(gym.Env):
 
     """
 
-    def _get_debug_info(self):
+    def _get_info(self):
         # Get the debug info
         return {
             'steps': self.state['steps'],

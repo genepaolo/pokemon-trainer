@@ -916,12 +916,14 @@ Then use Option 2 to make debug mode use it.
 
 | Change | File | Lines | Effect |
 |--------|------|-------|--------|
-| Skip Oak Speech | `oak_speech/oak_speech.asm` | 64-67 | Unconditional jump past intro dialog |
-| Skip Intro Animation | `home/init.asm` | 99 | Comment out `PlayIntro` |
-| Skip Title/Menu | `movie/title.asm` | 28-48 | Initialize display, jump to game |
-| Export Function | `menus/main_menu.asm` | 321 | Make `StartNewGameDebug` global |
-| Custom Names | `movie/title.asm` | 434-438 | Set player/rival names |
-| Skip End Animations | `oak_speech/oak_speech.asm` | 103-123 | Skip dialogue and shrinking animation |
+| 1. Skip Oak Speech | `oak_speech/oak_speech.asm` | 64-67 | Unconditional jump past intro dialog |
+| 2. Skip Intro Animation | `home/init.asm` | 99 | Comment out `PlayIntro` |
+| 3. Skip Title/Menu | `movie/title.asm` | 28-48 | Initialize display, jump to game |
+| 4. Export Function | `menus/main_menu.asm` | 321 | Make `StartNewGameDebug` global |
+| 5. Custom Names | `movie/title.asm` | 434-438 | Set player/rival names |
+| 6. Skip End Animations | `oak_speech/oak_speech.asm` | 103-123 | Skip dialogue and shrinking animation |
+| 7. Disable Viridian Event Triggers | `scripts/ViridianCity.asm` | 18-66 | Prevent forced movement on event tiles |
+| 8. Disable Viridian Gym Warp | `data/maps/objects/ViridianCity.asm` | 18-19 | Prevent entering gym |
 
 **Current Game Flow After Changes**:
 1. Game starts → Skip intro battle animation (Gengar vs Nidorino)
@@ -1176,6 +1178,159 @@ An isolated 3-map walking simulator has been created for RL training. This provi
 1. Header connection flags MUST match actual connections defined
 2. Keep `const_export` lines even when removing NPCs (scripts reference them)
 3. Scripts are separate from sprites - removing Oak sprite doesn't disable his cutscene
+
+---
+
+## Viridian City Event Fixes for Walker
+
+Additional changes were made to Viridian City to prevent the walker from getting stuck on event tiles that trigger forced player movement.
+
+### Change 7: Disable Viridian City Tile Event Triggers
+
+**Purpose**: Prevent forced player movement when stepping on specific event tiles in Viridian City.
+
+**Problem**: Two tile events in Viridian City would trigger dialogs and simulate button presses (forcing the player to move DOWN), which the walker environment cannot handle. This caused the agent to get stuck.
+
+**Files Modified**:
+
+#### 1. Gym Locked Event (File: `pokered_experimental/scripts/ViridianCity.asm`)
+
+**Location**: Lines 18-44
+
+**Original Code**:
+```asm
+ViridianCityCheckGymOpenScript:
+	CheckEvent EVENT_VIRIDIAN_GYM_OPEN
+	ret nz
+	ld a, [wObtainedBadges]
+	cp ~(1 << BIT_EARTHBADGE)
+	jr nz, .gym_closed
+	SetEvent EVENT_VIRIDIAN_GYM_OPEN
+	ret
+.gym_closed
+	ld a, [wYCoord]
+	cp 8
+	ret nz
+	ld a, [wXCoord]
+	cp 32
+	ret nz
+	ld a, TEXT_VIRIDIANCITY_GYM_LOCKED
+	ldh [hTextID], a
+	call DisplayTextID
+	xor a
+	ldh [hJoyHeld], a
+	call ViridianCityMovePlayerDownScript
+	ld a, SCRIPT_VIRIDIANCITY_PLAYER_MOVING_DOWN
+	ld [wViridianCityCurScript], a
+	ret
+```
+
+**Modified Code**:
+```asm
+ViridianCityCheckGymOpenScript:
+	; DISABLED FOR WALKER: Skip gym locked tile event
+	; This prevents the walker from getting stuck when walking near the gym
+	ret
+	; (original code commented out)
+```
+
+**Effect**: Disabled the event trigger at tile (32, 8) that would display "GYM IS LOCKED" and force the player to move DOWN.
+
+#### 2. Old Man Sleepy Event (File: `pokered_experimental/scripts/ViridianCity.asm`)
+
+**Location**: Lines 46-66
+
+**Original Code**:
+```asm
+ViridianCityCheckGotPokedexScript:
+	CheckEvent EVENT_GOT_POKEDEX
+	ret nz
+	ld a, [wYCoord]
+	cp 9
+	ret nz
+	ld a, [wXCoord]
+	cp 19
+	ret nz
+	ld a, TEXT_VIRIDIANCITY_OLD_MAN_SLEEPY
+	ldh [hTextID], a
+	call DisplayTextID
+	xor a
+	ldh [hJoyHeld], a
+	call ViridianCityMovePlayerDownScript
+	ld a, SCRIPT_VIRIDIANCITY_PLAYER_MOVING_DOWN
+	ld [wViridianCityCurScript], a
+	ret
+```
+
+**Modified Code**:
+```asm
+ViridianCityCheckGotPokedexScript:
+	; DISABLED FOR WALKER: Skip old man sleepy tile event
+	; This prevents the walker from getting stuck when walking near private property
+	ret
+	; (original code commented out)
+```
+
+**Effect**: Disabled the event trigger at tile (19, 9) that would display "PRIVATE PROPERTY" and force the player to move DOWN.
+
+**Technical Details**:
+- Both events used `ViridianCityMovePlayerDownScript` which simulates pressing the DOWN button via `wSimulatedJoypadStatesEnd`
+- The walker environment expects direct control through the `step()` method and cannot handle simulated joypad input
+- Commenting out these checks prevents the forced movement scripts from executing
+- Both functions now immediately return without checking player coordinates
+
+---
+
+### Change 8: Disable Viridian Gym Warp
+
+**Purpose**: Prevent the walker from entering the Viridian City Gym.
+
+**File**: `pokered_experimental/data/maps/objects/ViridianCity.asm`
+
+**Location**: Lines 18-19
+
+**Original Code**:
+```asm
+	def_warp_events
+	warp_event 23, 25, VIRIDIAN_POKECENTER, 1
+	warp_event 29, 19, VIRIDIAN_MART, 1
+	warp_event 21, 15, VIRIDIAN_SCHOOL_HOUSE, 1
+	warp_event 21,  9, VIRIDIAN_NICKNAME_HOUSE, 1
+	warp_event 32,  7, VIRIDIAN_GYM, 1
+```
+
+**Modified Code**:
+```asm
+	def_warp_events
+	warp_event 23, 25, VIRIDIAN_POKECENTER, 1
+	warp_event 29, 19, VIRIDIAN_MART, 1
+	warp_event 21, 15, VIRIDIAN_SCHOOL_HOUSE, 1
+	warp_event 21,  9, VIRIDIAN_NICKNAME_HOUSE, 1
+	; DISABLED FOR WALKER: Prevent entering Viridian Gym
+	; warp_event 32,  7, VIRIDIAN_GYM, 1
+```
+
+**Effect**:
+- The gym entrance warp at tile (32, 7) is disabled
+- Players can walk up to the gym door but will not enter when stepping on the tile
+- The walker can freely explore Viridian City without accidentally entering the gym
+
+**Technical Details**:
+- Warp events are defined in the map objects file and checked every frame
+- Commenting out the warp prevents the game from transitioning to the VIRIDIAN_GYM map
+- The tile is still walkable but has no special behavior
+
+---
+
+### Summary of Viridian City Changes
+
+| Change | File | Lines | Effect |
+|--------|------|-------|--------|
+| Disable Gym Locked Event | `scripts/ViridianCity.asm` | 18-44 | Prevents forced DOWN movement at tile (32, 8) |
+| Disable Old Man Sleepy Event | `scripts/ViridianCity.asm` | 46-66 | Prevents forced DOWN movement at tile (19, 9) |
+| Disable Gym Warp | `data/maps/objects/ViridianCity.asm` | 18-19 | Prevents entering gym at tile (32, 7) |
+
+**Result**: Walker can now freely explore Viridian City without getting stuck on event tiles or accidentally entering the gym.
 
 ---
 
